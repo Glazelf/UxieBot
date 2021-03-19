@@ -1,0 +1,47 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30717.126
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UxieBot.WinForms", "UxieBot.WinForms\UxieBot.WinForms.csproj", "{4980D5A9-0030-4B8E-BA26-98933242D3CF}"
+	ProjectSection(ProjectDependencies) = postProject
+		{BF4CCD61-9371-4C54-9210-649D7F074680} = {BF4CCD61-9371-4C54-9210-649D7F074680}
+		{744625D3-F9B4-4756-95D4-6BA1966C5757} = {744625D3-F9B4-4756-95D4-6BA1966C5757}
+	EndProjectSection
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UxieBot.Cart", "UxieBot.Cart\UxieBot.Cart.csproj", "{BF4CCD61-9371-4C54-9210-649D7F074680}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UxieBot.Showdown", "UxieBot.Showdown\UxieBot.Showdown.csproj", "{744625D3-F9B4-4756-95D4-6BA1966C5757}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UxieBot.Common", "UxieBot.Common\UxieBot.Common.csproj", "{F8CD8780-3163-4E18-8771-50D2BBC68F62}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4980D5A9-0030-4B8E-BA26-98933242D3CF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4980D5A9-0030-4B8E-BA26-98933242D3CF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4980D5A9-0030-4B8E-BA26-98933242D3CF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4980D5A9-0030-4B8E-BA26-98933242D3CF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BF4CCD61-9371-4C54-9210-649D7F074680}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BF4CCD61-9371-4C54-9210-649D7F074680}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BF4CCD61-9371-4C54-9210-649D7F074680}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BF4CCD61-9371-4C54-9210-649D7F074680}.Release|Any CPU.Build.0 = Release|Any CPU
+		{744625D3-F9B4-4756-95D4-6BA1966C5757}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{744625D3-F9B4-4756-95D4-6BA1966C5757}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{744625D3-F9B4-4756-95D4-6BA1966C5757}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{744625D3-F9B4-4756-95D4-6BA1966C5757}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F8CD8780-3163-4E18-8771-50D2BBC68F62}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F8CD8780-3163-4E18-8771-50D2BBC68F62}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F8CD8780-3163-4E18-8771-50D2BBC68F62}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F8CD8780-3163-4E18-8771-50D2BBC68F62}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {612AC44A-9A6F-4D6E-BFFF-ABE4DA8249CF}
+	EndGlobalSection
+EndGlobal

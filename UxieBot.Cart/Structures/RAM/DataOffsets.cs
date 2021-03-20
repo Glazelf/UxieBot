@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace UxieBot.Cart
+﻿namespace UxieBot.Cart
 {
     public static class DataOffsets
     {

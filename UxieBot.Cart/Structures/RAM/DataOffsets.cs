@@ -12,53 +12,9 @@ namespace UxieBot.Cart
         public const uint TextSpeedOffset = 0x450690A0;
         public const uint ItemTreasureAddress = 0x45068970;
 
-        // Raid Offsets
-        // The dex number of the Pokémon the host currently has chosen. 
-        // Details for each player span 0x30, so add 0x30 to get to the next offset.
-        public const uint RaidP0PokemonOffset = 0x8398A294;
-        // Add to each Pokémon offset.  AltForm used.
-        public const uint RaidAltFormInc = 0x4;
-        // Add to each Pokémon offset.  0 = male, 1 = female, 2 = genderless.
-        public const uint RaidGenderIncr = 0x8;
-        // Add to each Pokémon offset.  Bool for whether the Pokémon is shiny.
-        public const uint RaidShinyIncr = 0xC;
-        // Add to each Pokémon offset.  Bool for whether they have locked in their Pokémon.
-        public const uint RaidLockedInIncr = 0x1C;
-        public const uint RaidBossOffset = 0x8398A25C;
-
         // 0 when not in a battle or raid, 0x40 or 0x41 otherwise.
         public const uint InBattleRaidOffsetSW = 0x3F128624;
         public const uint InBattleRaidOffsetSH = 0x3F128626;
-
-        // Pokémon Encounter Offsets
-        public const uint WildPokemonOffset = 0x8FEA3648;
-        public const uint RaidPokemonOffset = 0x886A95B8;
-        public const uint LegendaryPokemonOffset = 0x886BC348;
-
-        // Link Trade Offsets
-        public const uint LinkTradePartnerPokemonOffset = 0xAF286078;
-        public const uint LinkTradePartnerNameOffset = 0xAF28384C;
-        public const uint LinkTradeSearchingOffset = 0x2F76C3C8;
-
-        // Suprise Trade Offsets
-        public const uint SurpriseTradePartnerPokemonOffset = 0x450675a0;
-
-        public const uint SurpriseTradeLockSlot = 0x450676fc;
-        public const uint SurpriseTradeLockBox = 0x450676f8;
-
-        public const uint SurpriseTradeSearchOffset = 0x45067704;
-        public const uint SurpriseTradeSearch_Empty = 0x00000000;
-        public const uint SurpriseTradeSearch_Searching = 0x01000000;
-        public const uint SurpriseTradeSearch_Found = 0x0200012C;
-        public const uint SurpriseTradePartnerNameOffset = 0x45067708;
-
-        /* Wild Area Daycare */
-        public const uint DayCare_Wildarea_Step_Counter = 0x4511FC54;
-        public const uint DayCare_Wildarea_Egg_Is_Ready = 0x4511FC60;
-
-        /* Route 5 Daycare */
-        public const uint DayCare_Route5_Step_Counter = 0x4511F99C;
-        public const uint DayCare_Route5_Egg_Is_Ready = 0x4511F9A8;
 
         public const int BoxFormatSlotSize = 0x158;
         public const int TrainerDataLength = 0x110;

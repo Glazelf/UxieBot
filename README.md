@@ -1,6 +1,8 @@
 # UxieBot
-get it because brain big  
 I had a funny idea but forgot to make it functional at all again.  
+
+## Setup
+Clone https://github.com/smogon/pokemon-showdown and run your own server to train on with `node pokemon-showdown start --no-security`.
 
 ## Support
 Have questions? Either [create a discussion](https://github.com/Glazelf/UxieBot/discussions) or join my Discord.  

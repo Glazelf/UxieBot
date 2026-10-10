@@ -1,105 +1,126 @@
+# bot.py
 import asyncio
-from stable_baselines3 import PPO
-from poke_env.player import Player, MaxBasePowerPlayer
-from poke_env.environment import Gen9EnvSinglePlayer
-from poke_env.player.battle_order import DoubleBattleOrder
-from poke_env import AccountConfiguration, ShowdownServerConfiguration, LocalhostServerConfiguration
-# Import configuration details from config.py
-from config import BATTLE_FORMAT, SHOWDOWN_PASSWORD, SHOWDOWN_USERNAME, VGC_TEAM
-class RLTrainedPlayer(GenEnv):
-    def calc_reward(self, last_battle) -> float:
-        if last_battle.won:
-            return 10.0
-        elif last_battle.lost:
-            return -10.0
-        return 0.0
+import random
+from poke_env import LocalhostServerConfiguration
+from poke_env.player import MaxBasePowerPlayer, Player
 
-class VGCMaxDamageBot(Player):
+from config import BATTLE_FORMAT, SHOWDOWN_PASSWORD, SHOWDOWN_USERNAME, VGC_POLL_DATABASE
+
+def generate_random_vgc_team():
+  # Randomly pick 6 unique Pokémon sets from the pool to form a full VGC team
+  chosen_mons = random.sample(VGC_POLL_DATABASE, 6)
+  return "\n\n".join(chosen_mons)
+
+
+class CustomTrainingBot(Player):
+
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    self.training_score = 0
+    self.recent_results = []
+
   def choose_move(self, battle):
-    # Check if it's a double battle request
     if battle.in_team_preview:
-      # Automatically select the first 4 Pokémon during team preview
       return self.choose_random_doubles_move(battle)
 
-    # For standard turns in VGC, we need orders for both active Pokémon slots
-    if battle.active_pokemon:
-      orders = []
-      for pokemon in battle.active_pokemon:
-        # Find the available moves for this specific active Pokémon
-        available_moves = [
-            m for m in battle.available_moves if m.gen_pai_is_valid_target
-        ]  # or check pokemon.moves
+    actions = []
+    for i, active_mon in enumerate(battle.active_pokemon):
+      if not active_mon:
+        actions.append(None)
+        continue
 
-      # Fallback to random doubles choice if custom logic gets complex
-      return self.choose_random_doubles_move(battle)
+      # Handle forced fainted switches
+      if battle.force_switch and battle.force_switch[i]:
+        if battle.available_switches and battle.available_switches[i]:
+          actions.append(battle.available_switches[i][0])
+        else:
+          actions.append(None)
+        continue
+
+      avail_moves = battle.available_moves[i] if battle.available_moves else []
+      if avail_moves:
+        chosen_move = None
+        move_ids = [m.id for m in avail_moves]
+
+        # 1. Strategic utility priority
+        if "trickroom" in move_ids and not battle.trick_room:
+          chosen_move = next(m for m in avail_moves if m.id == "trickroom")
+        elif "sleeppowder" in move_ids:
+          chosen_move = next(m for m in avail_moves if m.id == "sleeppowder")
+        elif "fakeout" in move_ids:
+          chosen_move = next(m for m in avail_moves if m.id == "fakeout")
+        # 2. Default to highest base power attack
+        else:
+          attacking_moves = [m for m in avail_moves if (m.base_power or 0) > 0]
+          if attacking_moves:
+            chosen_move = max(attacking_moves, key=lambda m: m.base_power)
+          else:
+            chosen_move = avail_moves[0]
+
+        actions.append(chosen_move)
+      else:
+        if battle.available_switches and battle.available_switches[i]:
+          actions.append(battle.available_switches[i][0])
+        else:
+          actions.append(None)
+
+    valid_actions = [a for a in actions if a is not None]
+
+    if len(valid_actions) >= 2:
+      return self.create_order(valid_actions[0], valid_actions[1])
+    elif len(valid_actions) == 1:
+      return self.create_order(valid_actions[0])
 
     return self.choose_random_doubles_move(battle)
 
-# Alternative simpler built-in baseline bot for VGC:
-# poke-env includes built-in random and heuristic templates that natively handle doubles.
+  def _battle_finished(self, battle):
+    result = 1 if battle.won else 0
+    self.recent_results.append(result)
+    if len(self.recent_results) > 20:
+      self.recent_results.pop(0)
+
+    rolling_win_rate = (
+        sum(self.recent_results) / len(self.recent_results)
+    ) * 100
+
+    if battle.won:
+      self.training_score += 10
+      print(
+          f"[+] Match WON against {battle.opponent_username}! Score:"
+          f" {self.training_score} | Rolling Win Rate (Last"
+          f" {len(self.recent_results)}): {rolling_win_rate:.1f}%"
+      )
+    else:
+      self.training_score -= 10
+      print(
+          f"[-] Match LOST against {battle.opponent_username}. Score:"
+          f" {self.training_score} | Rolling Win Rate (Last"
+          f" {len(self.recent_results)}): {rolling_win_rate:.1f}%"
+      )
 
 
-class VGCHeuristicBot(MaxBasePowerPlayer):
-  pass
-account_config = AccountConfiguration(SHOWDOWN_USERNAME, SHOWDOWN_PASSWORD)
+async def run_local_training():
+  # Generate a fresh random 6-mon VGC team for this training session
+  session_team = generate_random_vgc_team()
 
-async def main():
-  # Configure your bot credentials (use guest mode or real account info)
-  # For local testing, you can pit two Python bots against each other:
-  player_1 = VGCHeuristicBot(
+  baseline_bot = MaxBasePowerPlayer(
       battle_format=BATTLE_FORMAT,
-      team=VGC_TEAM,
-      server_configuration=ShowdownServerConfiguration,
-  )
-
-  player_2 = VGCHeuristicBot(battle_format=BATTLE_FORMAT)
-
-  print("[+] Starting test battle between two Python VGC bots...")
-  await player_1.battle_against(player_2, n_battles=1)
-  print(f"[+] Battle finished! Won: {player_1.n_won_battles}")
-
-class VGCHeuristicBot(MaxBasePowerPlayer):
-  pass
-
-async def run_bot():
-  bot = VGCHeuristicBot(
-      account_configuration=account_config,
-      server_configuration=ShowdownServerConfiguration,
-      battle_format=BATTLE_FORMAT,
-      team=VGC_TEAM,
-      # Set max_concurrent_battles to accept multiple challenges at once
-      max_concurrent_battles=3,
-  )
-
-  print("[+] Bot is online and listening for VGC challenges...")
-  # Play a specific number of games on the official ladder (e.g., 10 games)
-  await bot.ladder(10)
-
-async def train_agent():
-  # 2. Use LocalhostServerConfiguration instead of None
-  baseline_opponent = MaxBasePowerPlayer(
-      battle_format=BATTLE_FORMAT,
+      team=session_team,
       server_configuration=LocalhostServerConfiguration,
   )
 
-  training_player = RLTrainedPlayer(
-      player_configuration=None,
+  my_bot = CustomTrainingBot(
       battle_format=BATTLE_FORMAT,
+      team=session_team,
       server_configuration=LocalhostServerConfiguration,
   )
 
-  print("[+] Initializing PPO neural network agent...")
-  model = PPO("MlpPolicy", training_player, verbose=1, n_steps=512)
-
-  print("[+] Training model via local baseline matches...")
-  model.learn(total_timesteps=10000)
-
-  model.save("vgc_ppo_model")
-  print("[+] Training complete! Model saved to vgc_ppo_model.zip")
+  print(
+      "[+] Starting local simulation training matches with a randomized 6-mon"
+      " VGC team pool..."
+  )
+  await my_bot.battle_against(baseline_bot, n_battles=50)
 
 
 if __name__ == "__main__":
-  asyncio.run(train_agent())
-
-# if __name__ == "__main__":
-#   asyncio.run(run_bot())
+  asyncio.run(run_local_training())

@@ -1,9 +1,18 @@
 import asyncio
-from poke_env.player import Player
+from stable_baselines3 import PPO
+from poke_env.player import Player, MaxBasePowerPlayer
+from poke_env.environment import Gen9EnvSinglePlayer
 from poke_env.player.battle_order import DoubleBattleOrder
-from poke_env import AccountConfiguration, ShowdownServerConfiguration
+from poke_env import AccountConfiguration, ShowdownServerConfiguration, LocalhostServerConfiguration
 # Import configuration details from config.py
 from config import BATTLE_FORMAT, SHOWDOWN_PASSWORD, SHOWDOWN_USERNAME, VGC_TEAM
+class RLTrainedPlayer(GenEnv):
+    def calc_reward(self, last_battle) -> float:
+        if last_battle.won:
+            return 10.0
+        elif last_battle.lost:
+            return -10.0
+        return 0.0
 
 class VGCMaxDamageBot(Player):
   def choose_move(self, battle):
@@ -28,11 +37,11 @@ class VGCMaxDamageBot(Player):
 
 # Alternative simpler built-in baseline bot for VGC:
 # poke-env includes built-in random and heuristic templates that natively handle doubles.
-from poke_env.player.baselines import MaxBasePowerPlayer
+
 
 class VGCHeuristicBot(MaxBasePowerPlayer):
   pass
-  account_config = AccountConfiguration(SHOWDOWN_USERNAME, SHOWDOWN_PASSWORD)
+account_config = AccountConfiguration(SHOWDOWN_USERNAME, SHOWDOWN_PASSWORD)
 
 async def main():
   # Configure your bot credentials (use guest mode or real account info)
@@ -66,5 +75,31 @@ async def run_bot():
   # Play a specific number of games on the official ladder (e.g., 10 games)
   await bot.ladder(10)
 
+async def train_agent():
+  # 2. Use LocalhostServerConfiguration instead of None
+  baseline_opponent = MaxBasePowerPlayer(
+      battle_format=BATTLE_FORMAT,
+      server_configuration=LocalhostServerConfiguration,
+  )
+
+  training_player = RLTrainedPlayer(
+      player_configuration=None,
+      battle_format=BATTLE_FORMAT,
+      server_configuration=LocalhostServerConfiguration,
+  )
+
+  print("[+] Initializing PPO neural network agent...")
+  model = PPO("MlpPolicy", training_player, verbose=1, n_steps=512)
+
+  print("[+] Training model via local baseline matches...")
+  model.learn(total_timesteps=10000)
+
+  model.save("vgc_ppo_model")
+  print("[+] Training complete! Model saved to vgc_ppo_model.zip")
+
+
 if __name__ == "__main__":
-  asyncio.run(run_bot())
+  asyncio.run(train_agent())
+
+# if __name__ == "__main__":
+#   asyncio.run(run_bot())

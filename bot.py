@@ -2,7 +2,8 @@ import asyncio
 from poke_env.player import Player
 from poke_env.player.battle_order import DoubleBattleOrder
 from poke_env import AccountConfiguration, ShowdownServerConfiguration
-import asyncio
+# Import configuration details from config.py
+from config import BATTLE_FORMAT, SHOWDOWN_PASSWORD, SHOWDOWN_USERNAME, VGC_TEAM
 
 class VGCMaxDamageBot(Player):
   def choose_move(self, battle):
@@ -31,17 +32,18 @@ from poke_env.player.baselines import MaxBasePowerPlayer
 
 class VGCHeuristicBot(MaxBasePowerPlayer):
   pass
+  account_config = AccountConfiguration(SHOWDOWN_USERNAME, SHOWDOWN_PASSWORD)
 
 async def main():
   # Configure your bot credentials (use guest mode or real account info)
   # For local testing, you can pit two Python bots against each other:
   player_1 = VGCHeuristicBot(
-      battle_format="gen9championsvgc2026regmc",
+      battle_format=BATTLE_FORMAT,
       team=VGC_TEAM,
       server_configuration=ShowdownServerConfiguration,
   )
 
-  player_2 = VGCHeuristicBot(battle_format="gen9championsvgc2026regmc")
+  player_2 = VGCHeuristicBot(battle_format=BATTLE_FORMAT)
 
   print("[+] Starting test battle between two Python VGC bots...")
   await player_1.battle_against(player_2, n_battles=1)
@@ -50,77 +52,11 @@ async def main():
 class VGCHeuristicBot(MaxBasePowerPlayer):
   pass
 
-# Optional: Set a specific username and password (or leave blank for guest)
-config = AccountConfiguration("UxieIsCool", "appelsap")
-
-# Standard VGC Team in Showdown Export format
-VGC_TEAM = """
-Indeedee (M) @ Focus Sash  
-Ability: Psychic Surge  
-Level: 50  
-EVs: 2 HP / 32 SpA / 32 Spe  
-Timid Nature  
-- Protect  
-- Expanding Force  
-- Imprison  
-- Trick Room  
-
-Gliscor @ Psychic Seed  
-Ability: Hyper Cutter  
-Level: 50  
-EVs: 15 HP / 25 Atk / 26 Spe  
-Adamant Nature  
-- Protect  
-- High Horsepower  
-- Acrobatics  
-- Tailwind  
-
-Kingambit @ Chople Berry  
-Ability: Defiant  
-Level: 50  
-EVs: 32 HP / 9 Atk / 14 Def / 11 SpD  
-Adamant Nature  
-- Kowtow Cleave  
-- Iron Head  
-- Sucker Punch  
-- Low Kick  
-
-Charizard @ Charizardite Y  
-Ability: Blaze  
-Level: 50  
-EVs: 32 HP / 11 Def / 1 SpA / 21 SpD / 1 Spe  
-Modest Nature  
-- Protect  
-- Heat Wave  
-- Ancient Power  
-- Weather Ball  
-
-Annihilape @ Choice Scarf  
-Ability: Defiant  
-Level: 50  
-EVs: 32 Atk / 2 Def / 32 Spe  
-Jolly Nature  
-- Close Combat  
-- Phantom Force  
-- Ice Punch  
-- Rock Slide  
-
-Venusaur @ Wide Lens  
-Ability: Chlorophyll  
-Level: 50  
-EVs: 24 HP / 12 SpA / 30 Spe  
-Timid Nature  
-- Protect  
-- Sludge Bomb  
-- Leaf Storm  
-- Sleep Powder  
-""".strip()
-
 async def run_bot():
   bot = VGCHeuristicBot(
-      account_configuration=config,
+      account_configuration=account_config,
       server_configuration=ShowdownServerConfiguration,
-      battle_format="gen9championsvgc2026regmc",
+      battle_format=BATTLE_FORMAT,
       team=VGC_TEAM,
       # Set max_concurrent_battles to accept multiple challenges at once
       max_concurrent_battles=3,

@@ -1,6 +1,8 @@
 # UxieBot
 I had a funny idea but forgot to make it functional at all again.  
-Started this repository years ago as a bot for Pokémon Sword and Shield when I had no idea what I was doing and decided to give it another go since making Showdown bots has picked up a lot of popularity recently and it seemed fun to tinker with.  
+Started this repository years ago as a bot for Pokémon Sword and Shield when I had no idea what I was doing.  
+I dropped this as the Nintendo Switch 2 got announced and was very unlikely to (ever) have similar Homebrew capacities to the Nintendo Switch.  
+Now I've decided to give it another go since making Showdown bots has picked up a lot of popularity recently and it seemed fun to tinker with.  
 This repository is very much not meant for you to clone and run as your own bot, it's really just me trying to get better at this while you can follow along, contribute, raise issues and more.  
 
 ## Setup

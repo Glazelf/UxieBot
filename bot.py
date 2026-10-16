@@ -107,7 +107,9 @@ class CustomTrainingBot(Player):
       if battle.force_switch and battle.force_switch[i]:
         if battle.available_switches and battle.available_switches[i]:
           switch_choice = battle.available_switches[i][0]
-          self._current_battle_actions.append(("switch", switch_choice.id))
+          # Pokemon objects from poke_env don't have an `id` attribute. Use species/name
+          switch_id = getattr(switch_choice, "species", None) or getattr(switch_choice, "name", None) or str(switch_choice)
+          self._current_battle_actions.append(("switch", switch_id))
           actions.append(switch_choice)
         else:
           actions.append(None)
@@ -120,7 +122,8 @@ class CustomTrainingBot(Player):
       else:
         if battle.available_switches and battle.available_switches[i]:
           switch_choice = battle.available_switches[i][0]
-          self._current_battle_actions.append(("switch", switch_choice.id))
+          switch_id = getattr(switch_choice, "species", None) or getattr(switch_choice, "name", None) or str(switch_choice)
+          self._current_battle_actions.append(("switch", switch_id))
           actions.append(switch_choice)
         else:
           actions.append(None)

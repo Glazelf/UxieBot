@@ -1,10 +1,16 @@
 # bot.py
 import asyncio
 import random
+import json
+import os
+import math
 from poke_env import LocalhostServerConfiguration
 from poke_env.player import MaxBasePowerPlayer, Player
 
 from config import BATTLE_FORMAT, SHOWDOWN_PASSWORD, SHOWDOWN_USERNAME, VGC_POLL_DATABASE
+
+POLICY_FILE = "policy.json"
+
 
 def generate_random_vgc_team():
   # Randomly pick 6 unique Pokémon sets from the pool to form a full VGC team
@@ -14,10 +20,79 @@ def generate_random_vgc_team():
 
 class CustomTrainingBot(Player):
 
-  def __init__(self, *args, **kwargs):
+  def __init__(self, *args, learning_rate=0.05, epsilon=0.1, **kwargs):
     super().__init__(*args, **kwargs)
+    # training bookkeeping
     self.training_score = 0
     self.recent_results = []
+
+    # reinforcement learning policy: a simple table mapping action keys -> weight
+    # action keys are strings like "move:thunderbolt" or "switch:charizard"
+    self.policy = {}
+    self.learning_rate = learning_rate
+    self.epsilon = epsilon
+
+    # per-battle action log to update policy after result is known
+    self._current_battle_actions = []
+
+    # try loading existing policy from disk so training can persist across runs
+    self._load_policy()
+
+  # --- Policy persistence ---
+  def _load_policy(self):
+    if os.path.exists(POLICY_FILE):
+      try:
+        with open(POLICY_FILE, "r") as f:
+          data = json.load(f)
+          # ensure numeric values
+          self.policy = {k: float(v) for k, v in data.items()}
+          print(f"[+] Loaded policy with {len(self.policy)} entries")
+      except Exception as e:
+        print(f"[!] Failed to load policy file: {e}")
+        self.policy = {}
+
+  def _save_policy(self):
+    try:
+      with open(POLICY_FILE, "w") as f:
+        json.dump(self.policy, f)
+    except Exception as e:
+      print(f"[!] Failed to save policy file: {e}")
+
+  # --- Helper for policy values ---
+  def _get_weight(self, action_key):
+    return self.policy.get(action_key, 0.0)
+
+  def _add_weight(self, action_key, delta):
+    self.policy[action_key] = self._get_weight(action_key) + delta
+
+  # --- Action selection using a simple softmax/epsilon-greedy hybrid ---
+  def _select_move_from_candidates(self, avail_moves, battle, side_index):
+    scores = []
+    for m in avail_moves:
+      move_key = f"move:{m.id}"
+      base_power = m.base_power or 0
+      base_score = base_power / 150.0
+      weight = self._get_weight(move_key)
+      combined = base_score + weight
+      scores.append((m, combined))
+
+    if random.random() < self.epsilon:
+      chosen_move = random.choice(avail_moves)
+    else:
+      max_score = max(s for _, s in scores)
+      exps = [math.exp(s - max_score) for _, s in scores]
+      total = sum(exps)
+      probs = [e / total for e in exps]
+      r = random.random()
+      cum = 0.0
+      for (m, _), p in zip(scores, probs):
+        cum += p
+        if r <= cum:
+          chosen_move = m
+          break
+
+    self._current_battle_actions.append(("move", chosen_move.id))
+    return chosen_move
 
   def choose_move(self, battle):
     if battle.in_team_preview:
@@ -29,38 +104,24 @@ class CustomTrainingBot(Player):
         actions.append(None)
         continue
 
-      # Handle forced fainted switches
       if battle.force_switch and battle.force_switch[i]:
         if battle.available_switches and battle.available_switches[i]:
-          actions.append(battle.available_switches[i][0])
+          switch_choice = battle.available_switches[i][0]
+          self._current_battle_actions.append(("switch", switch_choice.id))
+          actions.append(switch_choice)
         else:
           actions.append(None)
         continue
 
       avail_moves = battle.available_moves[i] if battle.available_moves else []
       if avail_moves:
-        chosen_move = None
-        move_ids = [m.id for m in avail_moves]
-
-        # 1. Strategic utility priority
-        if "trickroom" in move_ids and not battle.trick_room:
-          chosen_move = next(m for m in avail_moves if m.id == "trickroom")
-        elif "sleeppowder" in move_ids:
-          chosen_move = next(m for m in avail_moves if m.id == "sleeppowder")
-        elif "fakeout" in move_ids:
-          chosen_move = next(m for m in avail_moves if m.id == "fakeout")
-        # 2. Default to highest base power attack
-        else:
-          attacking_moves = [m for m in avail_moves if (m.base_power or 0) > 0]
-          if attacking_moves:
-            chosen_move = max(attacking_moves, key=lambda m: m.base_power)
-          else:
-            chosen_move = avail_moves[0]
-
+        chosen_move = self._select_move_from_candidates(avail_moves, battle, i)
         actions.append(chosen_move)
       else:
         if battle.available_switches and battle.available_switches[i]:
-          actions.append(battle.available_switches[i][0])
+          switch_choice = battle.available_switches[i][0]
+          self._current_battle_actions.append(("switch", switch_choice.id))
+          actions.append(switch_choice)
         else:
           actions.append(None)
 
@@ -98,9 +159,17 @@ class CustomTrainingBot(Player):
           f" {len(self.recent_results)}): {rolling_win_rate:.1f}%"
       )
 
+    reward = 1.0 if battle.won else -1.0
+    for action_type, action_id in self._current_battle_actions:
+      key = f"{action_type}:{action_id}"
+      self._add_weight(key, self.learning_rate * reward)
+
+    self.epsilon = max(0.01, self.epsilon * 0.995)
+    self._save_policy()
+    self._current_battle_actions = []
+
 
 async def run_local_training():
-  # Generate a fresh random 6-mon VGC team for this training session
   session_team = generate_random_vgc_team()
 
   baseline_bot = MaxBasePowerPlayer(

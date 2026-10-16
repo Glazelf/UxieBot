@@ -9,7 +9,7 @@ from poke_env.player import MaxBasePowerPlayer, Player
 
 from config import BATTLE_FORMAT, SHOWDOWN_PASSWORD, SHOWDOWN_USERNAME, VGC_POLL_DATABASE
 
-POLICY_FILE = "policy.json"
+DEFAULT_POLICY_FILE = "policy.json"
 
 
 def generate_random_vgc_team():
@@ -20,7 +20,7 @@ def generate_random_vgc_team():
 
 class CustomTrainingBot(Player):
 
-  def __init__(self, *args, learning_rate=0.05, epsilon=0.1, **kwargs):
+  def __init__(self, *args, policy_file: str = DEFAULT_POLICY_FILE, learning_rate=0.05, epsilon=0.1, **kwargs):
     super().__init__(*args, **kwargs)
     # training bookkeeping
     self.training_score = 0
@@ -32,6 +32,9 @@ class CustomTrainingBot(Player):
     self.learning_rate = learning_rate
     self.epsilon = epsilon
 
+    # where to persist this bot's policy (so two bots can have independent policies)
+    self.policy_file = policy_file
+
     # per-battle action log to update policy after result is known
     self._current_battle_actions = []
 
@@ -40,23 +43,23 @@ class CustomTrainingBot(Player):
 
   # --- Policy persistence ---
   def _load_policy(self):
-    if os.path.exists(POLICY_FILE):
+    if os.path.exists(self.policy_file):
       try:
-        with open(POLICY_FILE, "r") as f:
+        with open(self.policy_file, "r") as f:
           data = json.load(f)
           # ensure numeric values
           self.policy = {k: float(v) for k, v in data.items()}
-          print(f"[+] Loaded policy with {len(self.policy)} entries")
+          print(f"[+] Loaded policy ({self.policy_file}) with {len(self.policy)} entries")
       except Exception as e:
-        print(f"[!] Failed to load policy file: {e}")
+        print(f"[!] Failed to load policy file {self.policy_file}: {e}")
         self.policy = {}
 
   def _save_policy(self):
     try:
-      with open(POLICY_FILE, "w") as f:
+      with open(self.policy_file, "w") as f:
         json.dump(self.policy, f)
     except Exception as e:
-      print(f"[!] Failed to save policy file: {e}")
+      print(f"[!] Failed to save policy file {self.policy_file}: {e}")
 
   # --- Helper for policy values ---
   def _get_weight(self, action_key):
@@ -71,26 +74,37 @@ class CustomTrainingBot(Player):
     for m in avail_moves:
       move_key = f"move:{m.id}"
       base_power = m.base_power or 0
+      # Normalize base power (simple): divide by 150 to keep same order
       base_score = base_power / 150.0
       weight = self._get_weight(move_key)
       combined = base_score + weight
+
+      # Penalize pure-status moves slightly to avoid Protect/Status spam early in training
+      # Many status moves have base_power == 0; this small penalty encourages damaging moves
+      if base_power == 0:
+        combined -= 0.12
+
       scores.append((m, combined))
 
+    # Epsilon-greedy: with prob epsilon, choose a random move to explore
     if random.random() < self.epsilon:
       chosen_move = random.choice(avail_moves)
     else:
+      # softmax sampling to maintain stochasticity while biasing towards higher scores
       max_score = max(s for _, s in scores)
       exps = [math.exp(s - max_score) for _, s in scores]
       total = sum(exps)
       probs = [e / total for e in exps]
       r = random.random()
       cum = 0.0
+      chosen_move = avail_moves[0]
       for (m, _), p in zip(scores, probs):
         cum += p
         if r <= cum:
           chosen_move = m
           break
 
+    # log action for learning
     self._current_battle_actions.append(("move", chosen_move.id))
     return chosen_move
 
@@ -104,8 +118,9 @@ class CustomTrainingBot(Player):
         actions.append(None)
         continue
 
-      if battle.force_switch and battle.force_switch[i]:
-        if battle.available_switches and battle.available_switches[i]:
+      # Handle forced fainted switches
+      if getattr(battle, "force_switch", None) and battle.force_switch[i]:
+        if getattr(battle, "available_switches", None) and battle.available_switches[i]:
           switch_choice = battle.available_switches[i][0]
           # Pokemon objects from poke_env don't have an `id` attribute. Use species/name
           switch_id = getattr(switch_choice, "species", None) or getattr(switch_choice, "name", None) or str(switch_choice)
@@ -115,12 +130,12 @@ class CustomTrainingBot(Player):
           actions.append(None)
         continue
 
-      avail_moves = battle.available_moves[i] if battle.available_moves else []
+      avail_moves = battle.available_moves[i] if getattr(battle, "available_moves", None) else []
       if avail_moves:
         chosen_move = self._select_move_from_candidates(avail_moves, battle, i)
         actions.append(chosen_move)
       else:
-        if battle.available_switches and battle.available_switches[i]:
+        if getattr(battle, "available_switches", None) and battle.available_switches[i]:
           switch_choice = battle.available_switches[i][0]
           switch_id = getattr(switch_choice, "species", None) or getattr(switch_choice, "name", None) or str(switch_choice)
           self._current_battle_actions.append(("switch", switch_id))
@@ -162,35 +177,53 @@ class CustomTrainingBot(Player):
           f" {len(self.recent_results)}): {rolling_win_rate:.1f}%"
       )
 
+    # Convert battle outcome to a reward: +1 for win, -1 for loss
     reward = 1.0 if battle.won else -1.0
+
+    # Update policy weights based on actions taken during this battle
+    # Simple update: for each action_key, add lr * reward
     for action_type, action_id in self._current_battle_actions:
       key = f"{action_type}:{action_id}"
       self._add_weight(key, self.learning_rate * reward)
 
+    # Decay epsilon slightly so we explore less over time
     self.epsilon = max(0.01, self.epsilon * 0.995)
+
+    # Save the updated policy to disk
     self._save_policy()
+
+    # Clear current battle actions for next battle
     self._current_battle_actions = []
 
 
 async def run_local_training():
+  # Generate a fresh random 6-mon VGC team for this training session
   session_team = generate_random_vgc_team()
 
-  baseline_bot = MaxBasePowerPlayer(
+  # Create two RL-enabled bots with separate policy files so they can both learn
+  baseline_bot = CustomTrainingBot(
       battle_format=BATTLE_FORMAT,
       team=session_team,
       server_configuration=LocalhostServerConfiguration,
+      policy_file="policy_baseline.json",
+      learning_rate=0.02,
+      epsilon=0.2,
   )
 
   my_bot = CustomTrainingBot(
       battle_format=BATTLE_FORMAT,
       team=session_team,
       server_configuration=LocalhostServerConfiguration,
+      policy_file="policy_mine.json",
+      learning_rate=0.05,
+      epsilon=0.1,
   )
 
   print(
       "[+] Starting local simulation training matches with a randomized 6-mon"
       " VGC team pool..."
   )
+  # Battle both RL bots against each other
   await my_bot.battle_against(baseline_bot, n_battles=50)
 
 
